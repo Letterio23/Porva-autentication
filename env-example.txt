@@ -1,0 +1,5 @@
+# Credenziali Sorare per test login
+# Copia questo file in .env e inserisci le tue credenziali
+
+SORARE_EMAIL=tua-email@example.com
+SORARE_PASSWORD=tua-password-qui
