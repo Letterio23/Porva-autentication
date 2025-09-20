@@ -1,6 +1,6 @@
 """
-Script semplice per testare login Sorare
-Verifica se le credenziali funzionano e stampa il risultato
+Script semplice per testare login Sorare - Versione migliorata
+Gestisce meglio gli errori di geolocalizzazione
 """
 
 import requests
@@ -34,7 +34,7 @@ def test_sorare_login(email, password):
     salt = get_user_salt(email)
     if not salt:
         print("❌ Impossibile ottenere salt. Email non valida?")
-        return False
+        return False, "INVALID_EMAIL"
     
     # Hash password
     print("🔒 Crittografando password...")
@@ -75,20 +75,32 @@ def test_sorare_login(email, password):
         
         if response.status_code != 200:
             print(f"❌ Errore HTTP: {response.status_code}")
-            return False
+            return False, "HTTP_ERROR"
         
         data = response.json()
         
         # Controlla se ci sono errori
         if "errors" in data:
             print(f"❌ Errore GraphQL: {data['errors']}")
-            return False
+            return False, "GRAPHQL_ERROR"
         
         sign_in_data = data.get("data", {}).get("signIn", {})
         
         if sign_in_data.get("errors"):
-            print(f"❌ Errore login: {sign_in_data['errors'][0]['message']}")
-            return False
+            error_message = sign_in_data['errors'][0]['message']
+            print(f"❌ Errore login: {error_message}")
+            
+            # Gestisci errori specifici
+            if "authenticate_from_new_country" in error_message:
+                print("🌍 ERRORE GEOLOCALIZZAZIONE RILEVATO!")
+                print("📧 Controlla la tua email per autorizzare la nuova location")
+                print("🔗 Oppure fai login manuale su sorare.com per confermare")
+                return False, "NEW_LOCATION"
+            elif "wrong" in error_message.lower():
+                print("🔑 Credenziali errate - controlla email e password")
+                return False, "WRONG_CREDENTIALS" 
+            else:
+                return False, "OTHER_ERROR"
         
         current_user = sign_in_data.get("currentUser")
         if current_user:
@@ -96,18 +108,18 @@ def test_sorare_login(email, password):
             print(f"👤 Utente: {current_user['nickname']}")
             print(f"📧 Email: {current_user['email']}")
             print(f"🔗 Slug: {current_user['slug']}")
-            return True
+            return True, "SUCCESS"
         else:
             print("❌ Login fallito - risposta vuota")
-            return False
+            return False, "EMPTY_RESPONSE"
             
     except Exception as e:
         print(f"❌ Errore durante il login: {e}")
-        return False
+        return False, "NETWORK_ERROR"
 
 def main():
     """Funzione principale"""
-    print("🎮 SORARE LOGIN TEST")
+    print("🎮 SORARE LOGIN TEST - v2.0")
     print("=" * 40)
     
     # Carica variabili d'ambiente
@@ -124,13 +136,34 @@ def main():
         sys.exit(1)
     
     # Testa login
-    success = test_sorare_login(email, password)
+    success, error_code = test_sorare_login(email, password)
+    
+    print("\n" + "=" * 40)
     
     if success:
-        print("\n🎉 SEI LOGGATO SU SORARE!")
+        print("🎉 SEI LOGGATO SU SORARE!")
+        print("✅ Il tuo script funziona perfettamente!")
+        print("🚀 Pronto per aggiungere automazione!")
         sys.exit(0)
     else:
-        print("\n😞 NON SEI LOGGATO SU SORARE")
+        print("😞 NON SEI LOGGATO SU SORARE")
+        
+        # Messaggi specifici per ogni errore
+        if error_code == "NEW_LOCATION":
+            print("\n💡 SOLUZIONE:")
+            print("1. Controlla email da Sorare per autorizzare nuova location")
+            print("2. OPPURE fai login manuale su sorare.com")
+            print("3. Poi ri-esegui questo script")
+            print("\n⚠️  NOTA: Le tue credenziali sono corrette!")
+        elif error_code == "WRONG_CREDENTIALS":
+            print("\n💡 SOLUZIONE:")
+            print("1. Verifica email e password su sorare.com")
+            print("2. Aggiorna le credenziali in .env o GitHub Secrets")
+        elif error_code == "INVALID_EMAIL":
+            print("\n💡 SOLUZIONE:")
+            print("1. Controlla che l'email sia scritta correttamente")
+            print("2. Assicurati sia la stessa usata per registrarti su Sorare")
+        
         sys.exit(1)
 
 if __name__ == "__main__":
